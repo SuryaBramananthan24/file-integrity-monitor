@@ -2,3 +2,4 @@ target/
 .idea/
 *.iml
 data/baseline.json
+monitored-files/application.log
