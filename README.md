@@ -207,7 +207,7 @@ file-integrity-monitor/
 ### File Integrity Dashboard
 
 ![File Integrity Dashboard](screenshots/grafana/integrity-dashboard.jpg)
-![System Performance Dashbaord](screenshots/grafana/system_dashboard.jpg)
+![System Performance Dashbaord](screenshots/grafana/systems_dashboard.jpg)
 
 ### Prometheus Alert
 
