@@ -11,12 +11,14 @@ public class MetricsService {
     private final Counter successfulChecks;
     private final Counter integrityViolations;
     private final Counter checkFailures;
+    private final Counter savedChecks;
 
     public MetricsService(MeterRegistry meterRegistry) {
         integrityChecks = Counter.builder("integrity.checks.total").description("Total number of file integrity checks").register(meterRegistry);
         successfulChecks = Counter.builder("integrity.checks.success.total").description("Total successful file integrity checks").register(meterRegistry);
         integrityViolations = Counter.builder("integrity.violations.total").description("Total number of file integrity violations").register(meterRegistry);
         checkFailures = Counter.builder("integrity.check.failures.total").description("Total number of integrity check failures").register(meterRegistry);
+        savedChecks = Counter.builder("integrity.checks.saved.total").description("Total number of integrity checks saved to baseline").register(meterRegistry); // ← ADD THIS
     }
 
     public void incrementIntegrityChecks() {
@@ -33,5 +35,9 @@ public class MetricsService {
 
     public void incrementFailures() {
         checkFailures.increment();
+    }
+
+    public void incrementSavedChecks() {
+        savedChecks.increment();
     }
 }
