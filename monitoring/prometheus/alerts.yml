@@ -1,0 +1,12 @@
+groups:
+  - name: file_integrity_alerts
+    rules:
+
+      - alert: FileIntegrityViolationDetected
+        expr: increase(integrity_violations_total[1m]) > 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "File integrity violation detected"
+          description: "One or more monitored files have been modified during the last minute."
