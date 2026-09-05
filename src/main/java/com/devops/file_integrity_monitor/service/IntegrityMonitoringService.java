@@ -1,34 +1,75 @@
 package com.devops.file_integrity_monitor.service;
 
-import com.devops.file_integrity_monitor.model.IntegrityResult;
-
+import com.devops.file_integrity_monitor.integrity.IntegrityBaseline;
+import com.devops.file_integrity_monitor.integrity.IntegrityEvaluator;
+import com.devops.file_integrity_monitor.integrity.IntegrityResult;
+import com.devops.file_integrity_monitor.integrity.IntegrityStatus;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
 
 @Service
 public class IntegrityMonitoringService {
 
-    private final FileHashService fileHashService;
     private final BaselineService baselineService;
+    private final IntegrityEvaluator integrityEvaluator;
 
-    public IntegrityMonitoringService(FileHashService fileHashService,BaselineService baselineService) {
-        this.fileHashService = fileHashService;
+    public IntegrityMonitoringService(
+            BaselineService baselineService,
+            IntegrityEvaluator integrityEvaluator) {
+
         this.baselineService = baselineService;
+        this.integrityEvaluator = integrityEvaluator;
     }
 
-    public IntegrityResult checkIntegrity(String filePath)throws Exception {
-        String baselineHash = baselineService.getBaseline(filePath);
-        if (baselineHash == null) {
-            return new IntegrityResult(filePath,null,null,false,"No baseline found for this file");
+    public IntegrityResult checkIntegrity(String filePath) {
+
+        String resourceId = Path.of(filePath)
+                .toAbsolutePath()
+                .normalize()
+                .toString();
+
+        try {
+
+            String baselineHash =
+                    baselineService.getBaseline(filePath);
+
+            if (baselineHash == null) {
+
+                return new IntegrityResult(
+                        resourceId,
+                        IntegrityStatus.ERROR,
+                        null,
+                        null,
+                        Instant.now()
+                );
+            }
+
+            IntegrityBaseline baseline =
+                    new IntegrityBaseline(
+                            resourceId,
+                            "filesystem-local",
+                            "SHA-256",
+                            baselineHash,
+                            Instant.now()
+                    );
+
+            return integrityEvaluator.evaluate(
+                    Path.of(filePath),
+                    baseline
+            );
+
+        } catch (IOException exception) {
+
+            return new IntegrityResult(
+                    resourceId,
+                    IntegrityStatus.ERROR,
+                    null,
+                    null,
+                    Instant.now()
+            );
         }
-        String currentHash = fileHashService.generateHash(filePath);
-        boolean integrityValid = baselineHash.equals(currentHash);
-        String message;
-        if (integrityValid) {
-            message = "File integrity verified successfully";
-        }
-        else {
-            message = "FILE INTEGRITY VIOLATION DETECTED";
-        }
-        return new IntegrityResult(filePath,baselineHash,currentHash,integrityValid,message);
     }
 }

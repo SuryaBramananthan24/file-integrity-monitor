@@ -1,13 +1,10 @@
 package com.devops.file_integrity_monitor;
 
-import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.testng.annotations.Test;
 
 @SpringBootTest
-class FileIntegrityMonitorApplicationTests {
-
+public class FileIntegrityMonitorApplicationTests {
 	@Test
-	void contextLoads() {
-	}
-
+	public void applicationContextLoads() {}
 }
