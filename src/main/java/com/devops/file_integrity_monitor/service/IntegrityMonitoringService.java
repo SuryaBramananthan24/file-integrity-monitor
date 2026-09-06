@@ -1,67 +1,94 @@
 package com.devops.file_integrity_monitor.service;
 
-import com.devops.file_integrity_monitor.integrity.IntegrityBaseline;
-import com.devops.file_integrity_monitor.integrity.IntegrityEvaluator;
-import com.devops.file_integrity_monitor.integrity.IntegrityResult;
-import com.devops.file_integrity_monitor.integrity.IntegrityStatus;
+import com.devops.file_integrity_monitor.integrity.*;
+import com.devops.file_integrity_monitor.persistence.IntegrityBaselineService;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Optional;
 
 @Service
 public class IntegrityMonitoringService {
 
-    private final BaselineService baselineService;
+    private static final String SOURCE_ID =
+            "filesystem-local";
+
+    private static final String HASH_ALGORITHM =
+            "SHA-256";
+
+    private final IntegrityBaselineService baselineService;
     private final IntegrityEvaluator integrityEvaluator;
+    private final DigestService digestService;
 
     public IntegrityMonitoringService(
-            BaselineService baselineService,
-            IntegrityEvaluator integrityEvaluator) {
+            IntegrityBaselineService baselineService,
+            IntegrityEvaluator integrityEvaluator,
+            DigestService digestService) {
 
         this.baselineService = baselineService;
         this.integrityEvaluator = integrityEvaluator;
+        this.digestService = digestService;
     }
 
-    public IntegrityResult checkIntegrity(String filePath) {
+    /**
+     * Create or update the PostgreSQL baseline
+     * for the supplied file.
+     */
+    public IntegrityBaseline createBaseline(
+            String filePath) throws IOException {
 
-        String resourceId = Path.of(filePath)
-                .toAbsolutePath()
-                .normalize()
-                .toString();
+        Path path = normalizePath(filePath);
 
-        try {
+        String digest =
+                digestService.calculate(path);
 
-            String baselineHash =
-                    baselineService.getBaseline(filePath);
-
-            if (baselineHash == null) {
-
-                return new IntegrityResult(
-                        resourceId,
-                        IntegrityStatus.ERROR,
-                        null,
-                        null,
+        IntegrityBaseline baseline =
+                new IntegrityBaseline(
+                        path.toString(),
+                        SOURCE_ID,
+                        HASH_ALGORITHM,
+                        digest,
                         Instant.now()
                 );
-            }
 
-            IntegrityBaseline baseline =
-                    new IntegrityBaseline(
-                            resourceId,
-                            "filesystem-local",
-                            "SHA-256",
-                            baselineHash,
-                            Instant.now()
-                    );
+        return baselineService.save(baseline);
+    }
 
-            return integrityEvaluator.evaluate(
-                    Path.of(filePath),
-                    baseline
-            );
+    /**
+     * Retrieve the PostgreSQL baseline for a file.
+     */
+    public Optional<IntegrityBaseline> getBaseline(
+            String filePath) {
 
-        } catch (IOException exception) {
+        Path path = normalizePath(filePath);
+
+        return baselineService.find(
+                SOURCE_ID,
+                path.toString()
+        );
+    }
+
+    /**
+     * Compare the current file contents against
+     * the authoritative PostgreSQL baseline.
+     */
+    public IntegrityResult checkIntegrity(
+            String filePath) {
+
+        Path path = normalizePath(filePath);
+
+        String resourceId =
+                path.toString();
+
+        Optional<IntegrityBaseline> baseline =
+                baselineService.find(
+                        SOURCE_ID,
+                        resourceId
+                );
+
+        if (baseline.isEmpty()) {
 
             return new IntegrityResult(
                     resourceId,
@@ -71,5 +98,17 @@ public class IntegrityMonitoringService {
                     Instant.now()
             );
         }
+
+        return integrityEvaluator.evaluate(
+                path,
+                baseline.get()
+        );
+    }
+
+    private Path normalizePath(String filePath) {
+
+        return Path.of(filePath)
+                .toAbsolutePath()
+                .normalize();
     }
 }

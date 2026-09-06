@@ -1,43 +1,88 @@
 package com.devops.file_integrity_monitor.controller;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import com.devops.file_integrity_monitor.integrity.IntegrityBaseline;
 import com.devops.file_integrity_monitor.integrity.IntegrityResult;
 import com.devops.file_integrity_monitor.service.IntegrityMonitoringService;
-import com.devops.file_integrity_monitor.service.FileHashService;
-import com.devops.file_integrity_monitor.service.BaselineService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
+@RequestMapping("/api")
 public class IntegrityController {
 
-    private final FileHashService fileHashService;
-    private final BaselineService baselineService;
     private final IntegrityMonitoringService integrityMonitoringService;
 
-    public IntegrityController(FileHashService fileHashService,BaselineService baselineService,IntegrityMonitoringService integrityMonitoringService) {
-        this.fileHashService = fileHashService;
-        this.baselineService = baselineService;
-        this.integrityMonitoringService = integrityMonitoringService;
+    public IntegrityController(
+            IntegrityMonitoringService integrityMonitoringService) {
+
+        this.integrityMonitoringService =
+                integrityMonitoringService;
     }
 
+    /**
+     * Create or update the PostgreSQL integrity baseline
+     * for a file.
+     */
+    @PostMapping("/baseline")
+    public ResponseEntity<?> createBaseline(
+            @RequestParam String path) {
 
-    @GetMapping("/api/hash")
-    public String generateHash(@RequestParam String path)throws Exception {
-        return fileHashService.calculateHash(path);
+        try {
+
+            IntegrityBaseline baseline =
+                    integrityMonitoringService.createBaseline(path);
+
+            return ResponseEntity.ok(baseline);
+
+        } catch (Exception exception) {
+
+            return ResponseEntity.badRequest()
+                    .body(
+                            Map.of(
+                                    "error",
+                                    "Unable to create integrity baseline",
+                                    "message",
+                                    exception.getMessage()
+                            )
+                    );
+        }
     }
 
-    @PostMapping("/api/baseline")
-    public String initializeBaseline(@RequestParam String path)throws Exception {
-        String hash = fileHashService.calculateHash(path);
-        baselineService.saveBaseline(path,hash);
-        return "Baseline initialized successfully for: "+ path;
+    /**
+     * Retrieve the PostgreSQL baseline for a file.
+     */
+    @GetMapping("/baseline")
+    public ResponseEntity<?> getBaseline(
+            @RequestParam String path) {
+
+        Optional<IntegrityBaseline> baseline =
+                integrityMonitoringService.getBaseline(path);
+
+        if (baseline.isEmpty()) {
+
+            return ResponseEntity.notFound()
+                    .build();
+        }
+
+        return ResponseEntity.ok(
+                baseline.get()
+        );
     }
 
-    @GetMapping("/api/integrity/check")
-    public IntegrityResult checkIntegrity(@RequestParam String path) throws Exception{
-        return integrityMonitoringService.checkIntegrity(path);
+    /**
+     * Check the current file against
+     * its PostgreSQL baseline.
+     */
+    @GetMapping("/integrity/check")
+    public ResponseEntity<IntegrityResult> checkIntegrity(
+            @RequestParam String path) {
+
+        IntegrityResult result =
+                integrityMonitoringService.checkIntegrity(path);
+
+        return ResponseEntity.ok(result);
     }
 }
