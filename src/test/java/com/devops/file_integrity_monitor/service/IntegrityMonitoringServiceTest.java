@@ -6,7 +6,7 @@ import com.devops.file_integrity_monitor.integrity.IntegrityEvaluator;
 import com.devops.file_integrity_monitor.persistence.IntegrityBaselineService;
 import org.testng.annotations.Test;
 import org.testng.asserts.SoftAssert;
-
+import com.devops.file_integrity_monitor.persistence.IntegrityAuditService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,12 +16,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 public class IntegrityMonitoringServiceTest{
+
     @Test
     public void shouldCreateAndPersistBaseline() throws IOException {
         SoftAssert softAssert = new SoftAssert();
         Path tempFile = Files.createTempFile("integrity-test",".txt");
         Files.writeString(tempFile,"test content");
-
+        IntegrityAuditService auditService = mock(IntegrityAuditService.class);
         IntegrityBaselineService baselineService = mock(IntegrityBaselineService.class);
         IntegrityEvaluator integrityEvaluator = mock(IntegrityEvaluator.class);
         DigestService digestService = mock(DigestService.class);
@@ -31,9 +32,7 @@ public class IntegrityMonitoringServiceTest{
 
         IntegrityBaseline expectedBaseline = new IntegrityBaseline(tempFile.toAbsolutePath().normalize().toString(),"filesystem-local","SHA-256",digest, Instant.now());
         when(baselineService.save(any(IntegrityBaseline.class))).thenReturn(expectedBaseline);
-
-        IntegrityMonitoringService service = new IntegrityMonitoringService(baselineService,integrityEvaluator,digestService);
-
+        IntegrityMonitoringService service = new IntegrityMonitoringService(baselineService,auditService,integrityEvaluator,digestService);
         IntegrityBaseline result = service.createBaseline(tempFile.toString());
 
         softAssert.assertNotNull(result,"Baseline should be created");
